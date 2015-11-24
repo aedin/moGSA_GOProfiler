@@ -1,0 +1,11 @@
+Package: mogsa_goprofiler
+Title: GOprofiler filtering of GeneSets with moGSA
+Version: 0.1
+Date: 2015-11-24
+Author: Aedin Culhane, Alex Sanchez
+Description: Reducing redundant GO geneses from a moGSA multiple -omics analysis
+Depends: RTCGAToolbox, mogsa, GOProfiler
+Imports: methods,GenomicRanges,Biobase,ComplexHeatmap
+Suggests: knitr
+License: GPLv3
+VignetteBuilder: knitr
