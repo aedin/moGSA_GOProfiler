@@ -142,8 +142,6 @@ library(org.Hs.eg.db)
 
 #GeneSet(GOCollection(c("GO:0005488", "GO:0019825"), evidenceCode="IDA"),geneIdType=EntrezIdentifier("org.Hs.eg.db"),setName="Sample GO Collection")
 
-
-
 EntrezGeneIDs<-keys(org.Hs.eg.db)
 
 # Mapped to All EntrezGeneIDs
@@ -170,25 +168,34 @@ summary(tt)
 
 ```
 
-## GO - maped to symbols
 
-```{r gsc_symbols}
-msigdb_v5.0_symbols<-prepMsigDB("../data/msigdb.v5.0.symbols.gmt")
-save(msigdb_v5.0_symbols, file="../data/msigdb_v5.0_symbols.rda")
+## Converting between Identifiers
+
+```{r ConvertID}
+keytypes(org.Hs.eg.db)
+
+#select(org.Hs.eg.db, keys="4488", columns=c("SYMBOL"), keytype="ENTREZID")
+
+select(org.Hs.eg.db, keys=c("E7EPC8" ,"Q9UQB3"), columns=c("ENTREZID", "SYMBOL"),keytype="UNIPROT")
 ```
 
-```{r SupplMisg}
-geneIds <- featureNames(se)[100:109]
-gsc <- GeneSetCollection(geneIds,
-        idType=SymbolIdentifier(),
-        setType=GOCollection(ontology="BP"))#
-annotSup <- prepSupMoa(lapply(se, exprs),geneSets=keggdb)
+## GO - maped to symbols
+
+For the current example I will only use a subset of MSigDB
+
+```{r gsc_symbols}
+#msigdb_v5.0_symbols<-prepMsigDB("../data/msigdb.v5.0.symbols.gmt")
+#save(msigdb_v5.0_symbols, file="../data/msigdb_v5.0_symbols.rda")
+load("../data/msigdb_v5.0_symbols.rda")
+annotSup <- prepSupMoa(lapply(se, exprs),geneSets=msigdb_v5.0_symbols)
 sapply(annotSup, dim)
 ```
 
 
 
-```{r RT}
+## Extra code that might be useful in future
+create a report of genesets using ReportingTools
+```{r RT,eval=FALSE}
 library(ReportingTools)
 gscReport <- HTMLReport(
      shortName="gsc_example",
@@ -199,24 +206,11 @@ url <- finish(gscReport)
 #The report can be viewed with
 browseURL(url)
 ```
+
 ## Using MSigDB
 
 1. [MSigDb] (http://www.broadinstitute.org/gsea/msigdb/download_file.jsp?filePath=/resources/msigdb/5.0/msigdb.v5.0.symbols.gmt)
 2. [GeneSigDB] (http://www.genesigdb.org/download/ALL_SIGSv4.gmt)
-```{r prepGMT, eval=FALSE}
-dirPath= system.file(package="mogsa")
-preGS <- prepMsigDB(file=paste(dirPath, "/extdata/example_msigdb_data.gmt.gz", sep = ""))
-annotSup2 <- prepSupMoa(lapply(se, exprs),geneSets=preGS)
-rownames(annotSup2)
-```
-
-For the purpose of this tutorial we will only look at the KEGG pathways (processed above using the graphite package). The annotation data is a simply binary matrix which indicates if a gene is present in a pathway.  There are 187 kegg pathways and the number of features in each matrix is the same as those in the multi omics list se.  Note no features in the rppa data mapped to KEGG. IMPORTANT: the number of features in the assay Data and in the annotation data have to match.  
-
-```{r aaa}
-sapply(annotSup,dim)
-sapply(annotSup,table)
-sapply(se, dim)
-```
 
 
 
@@ -224,13 +218,10 @@ sapply(se, dim)
 
 MOGSA algorithm consists of three steps. In the first step, multiple omics data are integrated using multi-table multivariate analysis, such as multiple factorial analysis (MFA). MFA projects the observations and variables (genes) from each dataset onto a lower dimensional space, resulting in sample scores (or PCs) and variables loadings respectively. Next, gene set annotations are projected as additional information onto the same space, generating a set of scores for each gene set across samples. In the final step, MOGSA generates a gene set score (GSS) matrix by reconstructing the sample scores and gene set scores. A high GSS indicates that gene set and the variables in that gene set have measurement in one or more dataset that explain a large proportion of the correlated information across data tables. Variables (genes) unique to individual datasets or common among matrices may contribute to a high GSS. For example, in a gene set, a few genes may have high levels of gene expression, others may have increased protein levels and a few may have amplifications in copy number.
 
-Here we show with an example how to use MOGSA to integrate and annotate multiple omics data.
 
-For this analysis we will exclude the rppa data that didn't map to the kegg pathways
+
 
 ```{r omit}
-i=1:3
-i=c(1,3)
 S2<- lapply(se[i], exprs)
 sapply(S2, dim)
 annotS2<-annotSup[i]
@@ -399,7 +390,7 @@ library(RTCGAToolbox)
 (ad <- getFirehoseAnalyzeDates(last=1))
 ```
 
-3. Download the dataset or load from the package bioc2015multiomicsworkshop. Then need to match identifiers
+3. Download the dataset. Then need to match identifiers
 
 ```{r getfirehosedatacalls, eval=FALSE}
 # fixed nchar issue. by changing nchar to base::nchar
