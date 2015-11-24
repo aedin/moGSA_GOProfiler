@@ -173,6 +173,11 @@ summary(tt)
 ## GO - maped to symbols
 
 ```{r gsc_symbols}
+msigdb_v5.0_symbols<-prepMsigDB("../data/msigdb.v5.0.symbols.gmt")
+save(msigdb_v5.0_symbols, file="../data/msigdb_v5.0_symbols.rda")
+```
+
+```{r SupplMisg}
 geneIds <- featureNames(se)[100:109]
 gsc <- GeneSetCollection(geneIds,
         idType=SymbolIdentifier(),
