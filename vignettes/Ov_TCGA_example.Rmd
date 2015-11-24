@@ -1,5 +1,5 @@
 ---
-title: "Multi-dataset Exploratory and Pathway data analysis of TCGA Ovarian Cancer Data"
+title: "Multi-dataset GO geneset data analysis of TCGA Ovarian Cancer Data and post-mogsa filtering with goProfiles"
 vignette: >
   %\VignetteIndexEntry{MultiEDA}
   %\VignetteEngine{knitr::rmarkdown}
@@ -15,23 +15,27 @@ output:
 ```{r, echo=FALSE, results="hide"}
 library(knitr)
 opts_chunk$set(error=FALSE,fig.path='./fig/', cache = TRUE, cache.path = "./Cache/")
+```
 
+```{r loadlibs}
+library(goProfiles)
+library(mogsa)
 require(gplots)
 ```
 
 
 
 
-TCGA  [TCGA data portal here](https://tcga-data.nci.nih.gov/tcga/) data were downlaoded  from the firehose data [firehose_get](https://confluence.broadinstitute.org/display/GDAC/Download) pipeline. Code to downlaod and generate the data is below
 
 
 
-#  Load Data
+#  Load Example DataSet
+The ovarian TCGA  [TCGA data portal here](https://tcga-data.nci.nih.gov/tcga/) data were downlaoded  from the firehose data [firehose_get](https://confluence.broadinstitute.org/display/GDAC/Download) pipeline. Code to downlaod and generate the data is below
 
-Load the library bioc2015multiomicsworkshop and the data set se.  Check that the sampleNames are consistent between assays.
+Load the data set, its called se.rda.  Check that the sampleNames are consistent between assays.
 
 ```{r loadSE}
-#library(mogsa_goprofile)
+#library(mogsa_goprofiles)
 #data(se)
 load("../data/se.rda")
 sapply(se, dim)
@@ -46,7 +50,7 @@ sapply(lapply(se, sampleNames), identical, sampleNames(se[[1]]))
 length(unique(lapply(se, sampleNames)))
 ```
 
-# Integrated Exploratory data analysis: Finding cluuters in the data
+# Review of basic functions in mogsa
 
 Using the package mogsa, we apply integrative dimension reduction methods, MFA using the moa() function. 
 
@@ -66,9 +70,9 @@ In this function, the input argument
 
 To run multiple factorial analysis (MFA), set statis=FALSE (the default setting). 
 
-```{r se.moa}
+```{r se.moa, eval=FALSE}
 require(mogsa)
-se.moa<-moa(lapply(se, exprs), proc.row = "center_ssq1", w.data = "inertia" )
+moa(lapply(se, exprs), proc.row = "center_ssq1", w.data = "inertia" )
 ```
 
 
@@ -80,13 +84,10 @@ mbpca(lapply(se, exprs), ncomp=10, method="blockScore")  # GCCA
 mbpca(lapply(se, exprs), ncomp=10, method="blockLoading")  # MCIA
 ```
 
-# Results of an analysis
 
-moa returns an S4 object with class "moa"
-```{r resmoc}
-class(se.moa)
-slotNames(se.moa)
-```
+
+moa will returns an S4 object with class "moa"
+
 
 The object include
 
@@ -107,65 +108,102 @@ The object include
 * **ctr.tab**: contribution of each data to the total variance.
 
 
-To extract any slot from an object of class moa, use the function slot (* we will improve this in a future release of the package)
+To extract results: 
 
-```{r extractSlots}
+```{r extractSlots,eval=FALSE}
 slot(se.moa, "partial.eig")[, 1:6] # extract the eigenvalue for each dataset
 slot(se.moa, "eig")[1:6] # extract the global eigenvalue
 slot(se.moa, "RV")
 ```
 
 
-To extract the global scores (of the observations) for the first 5 tumors on the first 5 components.
+To extract the global scores (of the observations) or the loadings or coefficients of the features of each dataset, we use or moaScores, moaCoef.
 
 
-```{r extractScores}
+```{r extractScores,eval=FALSE}
 scr<-moaScore(se.moa)
-scr[1:5,1:8]
-dim(scr)
-colnames(scr)[1:10]
-
-```
-
-
-To extract the loadings or coefficients of the features of each dataset, we use moaCoef. This returns a list of length 2.  The first object, is a data.frame of the concatentaed feature loadings. Therefore the nrow is equal to the total union of all features.  Features are renames rownames_dataset.  
-
-```{r extractCoefs}
 features<-moaCoef(se.moa)
-names(features)
-dim(features$coefMat)
-features$coefMat[1:10,1:4]
 ```
-
-The second object in the list is called *nonZeroCoef* and  is a list of data.frame to list the non-zero coefficient variable in each of loading vectors and data sets.
-
 
 
 #  Preparation of genesets 
 
-## Resources for GeneSet Analysis
-1. [MSigDb] (http://www.broadinstitute.org/gsea/msigdb/download_file.jsp?filePath=/resources/msigdb/5.0/msigdb.v5.0.symbols.gmt)
-2. [GeneSigDB] (http://www.genesigdb.org/download/ALL_SIGSv4.gmt)
+Preparation of GO genesets 
+
+## Mapped to Entrez GeneIDs (via org.Hs.eg.db)
+
+```{r gsc_entrezId, warning=FALSE, message=FALSE}
+#library(graphite)
+#keggdb <- prepGraphite(db = pathways("hsapiens", "kegg"), id = "symbol")
+
+library("GO.db")
+library(GSEABase)
+library(org.Hs.eg.db)
+
+#GeneSet(GOCollection(c("GO:0005488", "GO:0019825"), evidenceCode="IDA"),geneIdType=EntrezIdentifier("org.Hs.eg.db"),setName="Sample GO Collection")
 
 
-Preparation of KEGG, using the graphite library
-```{r prepGS, warning=FALSE, message=FALSE}
-library(graphite)
-keggdb <- prepGraphite(db = pathways("hsapiens", "kegg"), id = "symbol")
+
+EntrezGeneIDs<-keys(org.Hs.eg.db)
+
+# Mapped to All EntrezGeneIDs
+gsc <- GeneSetCollection(EntrezGeneIDs,
+        idType=AnnotationIdentifier("org.Hs.eg.db"),
+        setType=GOCollection(ontology="BP"))
+
+
+
+#GeneSetCollection(..,setType=GOCollection(evidenceCode="IMP"))
+#goId %in% names(gsc[lapply(mget(names(gsc), GOTERM), Ontology) == "MF"])
+#goId %in% names(gsc[lapply(mget(names(gsc), GOTERM), Ontology) == "BP"])
+
+# Subset to genesets with >2 
+idx <- sapply(gsc, function(x) length(geneIds(x))) > 2  
+length(idx)
+
+# View distribution of gene set lengths
+tt<-sapply(gsc, function(x) length(geneIds(x)))
+hist(tt)
+summary(tt)
+
+# View Distribution of geneset lengths
+
+```
+
+## GO - maped to symbols
+
+```{r gsc_symbols}
+geneIds <- featureNames(se)[100:109]
+gsc <- GeneSetCollection(geneIds,
+        idType=SymbolIdentifier(),
+        setType=GOCollection(ontology="BP"))#
 annotSup <- prepSupMoa(lapply(se, exprs),geneSets=keggdb)
 sapply(annotSup, dim)
 ```
 
 
-The MSigDB and GeneSigDB libraries of gene sets can be downloaded from the URLs above, and these can be processed using prepMsigDB.  There is a toy example of a mgt format in the extdata of the mogsa package (it has only 3 genesets).
 
+```{r RT}
+library(ReportingTools)
+gscReport <- HTMLReport(
+     shortName="gsc_example",
+     title="GSEABase Vignette GeneSetCollection",
+     basePath=tempdir())
+publish(gsc[idx], gscReport, annotation.db="org.Hs.eg")
+url <- finish(gscReport)
+#The report can be viewed with
+browseURL(url)
+```
+## Using MSigDB
+
+1. [MSigDb] (http://www.broadinstitute.org/gsea/msigdb/download_file.jsp?filePath=/resources/msigdb/5.0/msigdb.v5.0.symbols.gmt)
+2. [GeneSigDB] (http://www.genesigdb.org/download/ALL_SIGSv4.gmt)
 ```{r prepGMT, eval=FALSE}
 dirPath= system.file(package="mogsa")
 preGS <- prepMsigDB(file=paste(dirPath, "/extdata/example_msigdb_data.gmt.gz", sep = ""))
 annotSup2 <- prepSupMoa(lapply(se, exprs),geneSets=preGS)
 rownames(annotSup2)
 ```
-
 
 For the purpose of this tutorial we will only look at the KEGG pathways (processed above using the graphite package). The annotation data is a simply binary matrix which indicates if a gene is present in a pathway.  There are 187 kegg pathways and the number of features in each matrix is the same as those in the multi omics list se.  Note no features in the rppa data mapped to KEGG. IMPORTANT: the number of features in the assay Data and in the annotation data have to match.  
 
